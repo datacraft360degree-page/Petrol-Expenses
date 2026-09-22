@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -70,6 +71,11 @@
     </header>
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+        <!-- Sync Indicator Banner -->
+        <div id="syncStatus" class="hidden text-xs font-semibold px-4 py-2.5 rounded-xl border flex items-center justify-between transition-all">
+            <span id="syncText" class="flex items-center gap-2"></span>
+        </div>
 
         <!-- Metrics Overview Cards -->
         <section>
@@ -292,7 +298,7 @@
     </div>
 
     <footer class="bg-white border-t border-slate-200 py-4 mt-auto text-center text-xs text-slate-400">
-        Petrol Expense Tracker &bull; INR (₹) Currency Format &bull; Simple & Responsive Web App
+        Petrol Expense Tracker &bull; Connected to Google Sheets
     </footer>
 
     <!-- Toast Notification -->
@@ -302,12 +308,8 @@
     </div>
 
     <script>
-        // Initial dataset matching prompt specifications
-        const INITIAL_ENTRIES = [
-            { id: "e1", date: "2026-09-04", userAmount: 933.81, petrolPrice: 167.35, quantity: 5.58, notes: "HP Fuel Station" },
-            { id: "e2", date: "2026-09-10", userAmount: 491.33, petrolPrice: 113.47, quantity: 4.33, notes: "Indian Oil Pump" },
-            { id: "e3", date: "2026-09-16", userAmount: 424.38, petrolPrice: 113.47, quantity: 3.74, notes: "Bharat Petroleum" }
-        ];
+        // REPLACE WITH YOUR GOOGLE APPS SCRIPT WEB APP URL
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzwX-5zxNl3bQ6VsGnGEiIBQN4CXCcfkk_2DIXOCUOx7Y_X6by1p9hgHolUTxxzSPeyWA/exec";
 
         let entries = [];
 
@@ -316,6 +318,74 @@
             "July", "August", "September", "October", "November", "December"
         ];
 
+        function showSyncStatus(msg, status = 'loading') {
+            const syncEl = document.getElementById('syncStatus');
+            const syncText = document.getElementById('syncText');
+            syncEl.classList.remove('hidden', 'bg-amber-50', 'text-amber-800', 'border-amber-200', 'bg-rose-50', 'text-rose-800', 'border-rose-200', 'bg-emerald-50', 'text-emerald-800', 'border-emerald-200');
+
+            if (status === 'loading') {
+                syncEl.classList.add('bg-amber-50', 'text-amber-800', 'border-amber-200');
+                syncText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-amber-600"></i> ${msg}`;
+            } else if (status === 'error') {
+                syncEl.classList.add('bg-rose-50', 'text-rose-800', 'border-rose-200');
+                syncText.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-600"></i> ${msg}`;
+            } else {
+                syncEl.classList.add('bg-emerald-50', 'text-emerald-800', 'border-emerald-200');
+                syncText.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600"></i> ${msg}`;
+                setTimeout(() => syncEl.classList.add('hidden'), 3000);
+            }
+        }
+
+        async function fetchEntriesFromSheet() {
+            if (!SCRIPT_URL || SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+                showSyncStatus("Please configure SCRIPT_URL with your Google Apps Script Web App URL.", "error");
+                return;
+            }
+
+            showSyncStatus("Fetching expense records from Google Sheet...", "loading");
+
+            try {
+                const response = await fetch(SCRIPT_URL);
+                const data = await response.json();
+
+                if (Array.isArray(data)) {
+                    entries = data;
+                    populateFilterYears();
+                    renderHistoryTable();
+                    showSyncStatus("Data synced with Google Sheet", "success");
+                } else {
+                    showSyncStatus("Failed to load records from backend.", "error");
+                }
+            } catch (err) {
+                console.error(err);
+                showSyncStatus("Network error connecting to Google Sheet backend.", "error");
+            }
+        }
+
+        async function saveEntriesToSheet() {
+            if (!SCRIPT_URL || SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') return;
+
+            showSyncStatus("Saving changes to Google Sheet...", "loading");
+
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(entries)
+                });
+                const resData = await response.json();
+
+                if (resData.status === 'success') {
+                    showSyncStatus("Saved successfully to Google Sheet!", "success");
+                } else {
+                    showSyncStatus("Save failed: " + resData.message, "error");
+                }
+            } catch (err) {
+                console.error(err);
+                showSyncStatus("Network error saving changes.", "error");
+            }
+        }
+
         function formatINR(val) {
             return new Intl.NumberFormat('en-IN', {
                 style: 'currency',
@@ -323,37 +393,6 @@
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             }).format(val);
-        }
-
-        function initApp() {
-            const savedData = localStorage.getItem('petrol_entries_data_v3');
-            if (savedData) {
-                try {
-                    entries = JSON.parse(savedData);
-                } catch(e) {
-                    entries = [...INITIAL_ENTRIES];
-                }
-            } else {
-                entries = [...INITIAL_ENTRIES];
-                saveToLocalStorage();
-            }
-
-            populateFilterYears();
-            renderHistoryTable();
-        }
-
-        function saveToLocalStorage() {
-            localStorage.setItem('petrol_entries_data_v3', JSON.stringify(entries));
-        }
-
-        function resetToDefaults() {
-            if (confirm("Are you sure you want to reset all data to the initial default entries?")) {
-                entries = [...INITIAL_ENTRIES];
-                saveToLocalStorage();
-                populateFilterYears();
-                clearFilters();
-                showToast("Data reset to initial default entries.");
-            }
         }
 
         /* Modal Logic */
@@ -380,7 +419,6 @@
                 document.getElementById('editEntryId').value = '';
                 document.getElementById('entryDate').valueAsDate = new Date();
                 
-                // Default to ₹113.47 preset option
                 selectPricePreset(113.47);
 
                 modalTitle.innerText = "Add Fuel Fill-up Entry";
@@ -448,7 +486,7 @@
             }
         }
 
-        function handleFormSubmit(e) {
+        async function handleFormSubmit(e) {
             e.preventDefault();
 
             const dateVal = document.getElementById('entryDate').value;
@@ -474,7 +512,7 @@
                         quantity: qtyVal,
                         notes: notesVal 
                     };
-                    showToast("Entry updated successfully!");
+                    showToast("Entry updated!");
                 }
             } else {
                 const newEntry = {
@@ -489,23 +527,23 @@
                 showToast("New fuel fill-up recorded!");
             }
 
-            saveToLocalStorage();
             closeModal();
             populateFilterYears();
             renderHistoryTable();
+            await saveEntriesToSheet();
         }
 
         function editEntry(id) {
             openModal(id);
         }
 
-        function deleteEntry(id) {
+        async function deleteEntry(id) {
             if (confirm("Are you sure you want to delete this fill-up record?")) {
                 entries = entries.filter(item => item.id !== id);
-                saveToLocalStorage();
                 populateFilterYears();
                 renderHistoryTable();
                 showToast("Entry deleted.");
+                await saveEntriesToSheet();
             }
         }
 
@@ -579,8 +617,8 @@
 
             filtered.forEach(item => {
                 const liters = item.quantity || (item.userAmount / item.petrolPrice);
-                totalAmount += item.userAmount;
-                totalLiters += liters;
+                totalAmount += Number(item.userAmount);
+                totalLiters += Number(liters);
             });
 
             const avgPrice = totalLiters > 0 ? (totalAmount / totalLiters) : 0;
@@ -613,7 +651,7 @@
                 const d = new Date(item.date);
                 const year = d.getFullYear();
                 const monthName = MONTH_NAMES[d.getMonth()];
-                const liters = item.quantity ? item.quantity.toFixed(2) : (item.userAmount / item.petrolPrice).toFixed(2);
+                const liters = item.quantity ? Number(item.quantity).toFixed(2) : (item.userAmount / item.petrolPrice).toFixed(2);
                 const notesText = item.notes || '-';
 
                 return `
@@ -626,7 +664,7 @@
                         </td>
                         <td class="py-3.5 px-4 text-slate-600 text-xs font-medium">${notesText}</td>
                         <td class="py-3.5 px-4 text-right font-bold text-slate-900">${formatINR(item.userAmount)}</td>
-                        <td class="py-3.5 px-4 text-right text-slate-600 font-semibold">₹${item.petrolPrice.toFixed(2)}</td>
+                        <td class="py-3.5 px-4 text-right text-slate-600 font-semibold">₹${Number(item.petrolPrice).toFixed(2)}</td>
                         <td class="py-3.5 px-4 text-right font-semibold text-emerald-700">${liters} L</td>
                         <td class="py-3.5 px-4 text-center">
                             <div class="inline-flex items-center gap-1">
@@ -666,61 +704,6 @@
             showToast("CSV exported successfully.");
         }
 
-        function importCSV(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const text = e.target.result;
-                const lines = text.split("\n");
-                let importedCount = 0;
-
-                lines.forEach((line, index) => {
-                    if (index === 0 || !line.trim()) return;
-                    const cols = line.split(",");
-                    if (cols.length >= 3) {
-                        const date = cols[0].trim();
-                        let notes = "";
-                        let amount = 0;
-                        let price = 0;
-
-                        if (cols.length >= 5) {
-                            notes = cols[1].replace(/^"|"$/g, '').trim();
-                            amount = parseFloat(cols[2]);
-                            price = parseFloat(cols[3]);
-                        } else {
-                            amount = parseFloat(cols[1]);
-                            price = parseFloat(cols[2]);
-                        }
-
-                        if (date && !isNaN(amount) && !isNaN(price) && price > 0) {
-                            entries.push({
-                                id: 'e_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
-                                date: date,
-                                userAmount: amount,
-                                petrolPrice: price,
-                                quantity: parseFloat((amount / price).toFixed(2)),
-                                notes: notes
-                            });
-                            importedCount++;
-                        }
-                    }
-                });
-
-                if (importedCount > 0) {
-                    saveToLocalStorage();
-                    populateFilterYears();
-                    renderHistoryTable();
-                    showToast(`Successfully imported ${importedCount} fuel entries!`);
-                } else {
-                    showToast("Failed to parse CSV file format.", "error");
-                }
-                event.target.value = '';
-            };
-            reader.readAsText(file);
-        }
-
         function showToast(message, type = "success") {
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toastMsg');
@@ -740,7 +723,6 @@
             }, 3000);
         }
 
-        // Close modal when clicking backdrop
         window.onclick = function(e) {
             const modal = document.getElementById('entryModal');
             if (e.target === modal) {
@@ -749,7 +731,7 @@
         };
 
         window.onload = function() {
-            initApp();
+            fetchEntriesFromSheet();
         };
     </script>
 </body>
