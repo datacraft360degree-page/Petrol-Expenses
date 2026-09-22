@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -233,7 +232,6 @@
                     </div>
                 </div>
 
-                <!-- Price Per Liter Preset Selector + Custom Field Option -->
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                         Price / Liter (₹/L) <span class="text-rose-500">*</span>
@@ -257,7 +255,6 @@
                     </div>
                 </div>
 
-                <!-- Read-Only Quantity Field -->
                 <div>
                     <div class="flex items-center justify-between mb-1.5">
                         <label for="calculatedLiters" class="block text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -283,7 +280,6 @@
                         class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all">
                 </div>
 
-                <!-- Modal Actions Footer -->
                 <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
                     <button type="button" onclick="closeModal()" class="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
                         Cancel
@@ -301,14 +297,12 @@
         Petrol Expense Tracker &bull; Connected to Google Sheets
     </footer>
 
-    <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white text-xs px-4 py-3 rounded-xl shadow-xl transition-all transform translate-y-20 opacity-0 pointer-events-none flex items-center gap-2.5 z-50 border border-slate-800">
         <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
         <span id="toastMsg" class="font-medium">Notification message</span>
     </div>
 
     <script>
-        // REPLACE WITH YOUR GOOGLE APPS SCRIPT WEB APP URL
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzwX-5zxNl3bQ6VsGnGEiIBQN4CXCcfkk_2DIXOCUOx7Y_X6by1p9hgHolUTxxzSPeyWA/exec";
 
         let entries = [];
@@ -317,6 +311,36 @@
             "January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December"
         ];
+
+        function getISTDateString(dateObj = new Date()) {
+            return new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Asia/Kolkata',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            }).format(dateObj);
+        }
+
+        function parseISTDate(dateStr) {
+            if (!dateStr) return new Date();
+            const cleanStr = String(dateStr).split('T')[0];
+            const parts = cleanStr.split('-');
+            if (parts.length === 3) {
+                return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            }
+            return new Date(dateStr);
+        }
+
+        // Transforms YYYY-MM-DD or ISO dates into DD-MM-YYYY format
+        function displayFormattedDate(dateStr) {
+            if (!dateStr) return '';
+            const d = parseISTDate(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            const day = ("0" + d.getDate()).slice(-2);
+            const month = ("0" + (d.getMonth() + 1)).slice(-2);
+            const year = d.getFullYear();
+            return `${day}-${month}-${year}`;
+        }
 
         function showSyncStatus(msg, status = 'loading') {
             const syncEl = document.getElementById('syncStatus');
@@ -395,7 +419,6 @@
             }).format(val);
         }
 
-        /* Modal Logic */
         function openModal(editId = null) {
             const modal = document.getElementById('entryModal');
             const modalTitle = document.getElementById('modalTitle');
@@ -406,7 +429,7 @@
                 if (!item) return;
 
                 document.getElementById('editEntryId').value = item.id;
-                document.getElementById('entryDate').value = item.date;
+                document.getElementById('entryDate').value = item.date ? item.date.split('T')[0] : '';
                 document.getElementById('userAmount').value = item.userAmount;
                 document.getElementById('stationNotes').value = item.notes || '';
 
@@ -417,7 +440,7 @@
             } else {
                 document.getElementById('fillupForm').reset();
                 document.getElementById('editEntryId').value = '';
-                document.getElementById('entryDate').valueAsDate = new Date();
+                document.getElementById('entryDate').value = getISTDateString();
                 
                 selectPricePreset(113.47);
 
@@ -434,7 +457,6 @@
             document.getElementById('editEntryId').value = '';
         }
 
-        /* Preset Price Selector Handling */
         function selectPricePreset(price) {
             const priceInput = document.getElementById('petrolPrice');
             priceInput.value = price;
@@ -472,7 +494,6 @@
             }
         }
 
-        /* Auto Computation of Non-Editable Quantity */
         function calculateLitersPreview() {
             const amount = parseFloat(document.getElementById('userAmount').value) || 0;
             const price = parseFloat(document.getElementById('petrolPrice').value) || 0;
@@ -551,7 +572,7 @@
             const yearSelect = document.getElementById('filterYear');
             const currentSelectedYear = yearSelect.value;
             
-            const years = [...new Set(entries.map(e => new Date(e.date).getFullYear()))].sort((a,b) => b - a);
+            const years = [...new Set(entries.map(e => parseISTDate(e.date).getFullYear()))].sort((a,b) => b - a);
 
             yearSelect.innerHTML = '<option value="ALL">All Years</option>';
             years.forEach(y => {
@@ -587,30 +608,30 @@
             const selectedMonth = document.getElementById('filterMonth').value;
             const searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
 
-            let filtered = [...entries].sort((a,b) => new Date(b.date) - new Date(a.date));
+            let filtered = [...entries].sort((a,b) => parseISTDate(b.date) - parseISTDate(a.date));
 
             if (selectedYear !== "ALL") {
-                filtered = filtered.filter(e => new Date(e.date).getFullYear() == selectedYear);
+                filtered = filtered.filter(e => parseISTDate(e.date).getFullYear() == selectedYear);
             }
 
             if (selectedMonth !== "ALL") {
                 filtered = filtered.filter(e => {
-                    const mName = MONTH_NAMES[new Date(e.date).getMonth()];
+                    const mName = MONTH_NAMES[parseISTDate(e.date).getMonth()];
                     return mName === selectedMonth;
                 });
             }
 
             if (searchQuery) {
                 filtered = filtered.filter(e => {
-                    const d = e.date.toLowerCase();
+                    const dFormatted = displayFormattedDate(e.date).toLowerCase();
+                    const dRaw = (e.date || '').toLowerCase();
                     const amt = e.userAmount.toString();
                     const price = e.petrolPrice.toString();
                     const notes = (e.notes || '').toLowerCase();
-                    return d.includes(searchQuery) || amt.includes(searchQuery) || price.includes(searchQuery) || notes.includes(searchQuery);
+                    return dFormatted.includes(searchQuery) || dRaw.includes(searchQuery) || amt.includes(searchQuery) || price.includes(searchQuery) || notes.includes(searchQuery);
                 });
             }
 
-            // Calculate KPI Summary Cards
             let totalAmount = 0;
             let totalLiters = 0;
             let count = filtered.length;
@@ -648,15 +669,16 @@
             }
 
             tbody.innerHTML = filtered.map(item => {
-                const d = new Date(item.date);
+                const d = parseISTDate(item.date);
                 const year = d.getFullYear();
                 const monthName = MONTH_NAMES[d.getMonth()];
                 const liters = item.quantity ? Number(item.quantity).toFixed(2) : (item.userAmount / item.petrolPrice).toFixed(2);
                 const notesText = item.notes || '-';
+                const formattedDate = displayFormattedDate(item.date);
 
                 return `
                     <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="py-3.5 px-4 font-semibold text-slate-800">${item.date}</td>
+                        <td class="py-3.5 px-4 font-semibold text-slate-800">${formattedDate}</td>
                         <td class="py-3.5 px-4 text-slate-600">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
                                 ${year} ${monthName}
@@ -691,13 +713,14 @@
             entries.forEach(e => {
                 const qty = e.quantity || (e.userAmount / e.petrolPrice).toFixed(2);
                 const notes = `"${(e.notes || '').replace(/"/g, '""')}"`;
-                csvContent += `${e.date},${notes},${e.userAmount},${e.petrolPrice},${qty}\n`;
+                const formattedDate = displayFormattedDate(e.date);
+                csvContent += `${formattedDate},${notes},${e.userAmount},${e.petrolPrice},${qty}\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `Petrol_Expenses_${new Date().toISOString().split('T')[0]}.csv`);
+            link.setAttribute("download", `Petrol_Expenses_${getISTDateString()}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
