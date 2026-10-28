@@ -366,7 +366,7 @@
                 return;
             }
 
-            showSyncStatus("Fetching expense records from Google Sheet...", "loading");
+            showSyncStatus("Fetching expense records from Cloud Storage...", "loading");
 
             try {
                 const response = await fetch(SCRIPT_URL);
@@ -376,20 +376,20 @@
                     entries = data;
                     populateFilterYears();
                     renderHistoryTable();
-                    showSyncStatus("Data synced with Google Sheet", "success");
+                    showSyncStatus("Data synced with Cloud Storage", "success");
                 } else {
                     showSyncStatus("Failed to load records from backend.", "error");
                 }
             } catch (err) {
                 console.error(err);
-                showSyncStatus("Network error connecting to Google Sheet backend.", "error");
+                showSyncStatus("Network error connecting to Cloud Storage backend.", "error");
             }
         }
 
         async function saveEntriesToSheet() {
             if (!SCRIPT_URL || SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') return;
 
-            showSyncStatus("Saving changes to Google Sheet...", "loading");
+            showSyncStatus("Saving changes to Cloud Storage...", "loading");
 
             try {
                 const response = await fetch(SCRIPT_URL, {
